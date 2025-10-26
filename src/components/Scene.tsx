@@ -1,21 +1,22 @@
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, Environment } from '@react-three/drei'
-import { BeatSphere } from './BeatSphere'
+import { OrbitControls, Environment, PerspectiveCamera } from '@react-three/drei'
+import { FallingNotes } from './FallingNotes'
+import type { Note } from '../hooks/useBeatGame'
 
 interface SceneProps {
-  beatActive: boolean
+  notes: Note[]
+  currentTime: number
   combo: number
   backgroundColor: string
 }
 
-export function Scene({ beatActive, combo, backgroundColor }: SceneProps) {
+export function Scene({ notes, currentTime, combo, backgroundColor }: SceneProps) {
   return (
     <Canvas
-      camera={{ position: [0, 0, 5], fov: 50 }}
       style={{
         width: '100%',
         height: '100%',
-        background: `linear-gradient(135deg, ${backgroundColor} 0%, #0f0f1e 100%)`
+        background: `linear-gradient(180deg, ${backgroundColor} 0%, #000000 100%)`
       }}
       dpr={[1, 2]}
       gl={{
@@ -24,23 +25,32 @@ export function Scene({ beatActive, combo, backgroundColor }: SceneProps) {
         powerPreference: 'high-performance'
       }}
     >
-      <ambientLight intensity={0.5} />
-      <pointLight position={[10, 10, 10]} intensity={1} />
-      <pointLight position={[-10, -10, -10]} intensity={0.5} color="#8338ec" />
+      <PerspectiveCamera makeDefault position={[0, 3, 5]} fov={60} />
 
-      <BeatSphere beatActive={beatActive} combo={combo} />
+      <ambientLight intensity={0.3} />
+      <pointLight position={[0, 5, 5]} intensity={1} color="#00d4ff" />
+      <pointLight position={[0, -5, 5]} intensity={0.5} color="#ff00ff" />
 
-      {/* Subtle environment for reflections */}
+      {/* Background glow effect */}
+      <mesh position={[0, 0, -15]}>
+        <planeGeometry args={[30, 30]} />
+        <meshBasicMaterial
+          color={combo > 10 ? '#ff00ff' : combo > 5 ? '#00d4ff' : '#1a1a2e'}
+          transparent
+          opacity={0.3}
+        />
+      </mesh>
+
+      {/* Falling notes system */}
+      <FallingNotes notes={notes} currentTime={currentTime} />
+
+      {/* Floor grid */}
+      <gridHelper args={[20, 20, '#333333', '#111111']} position={[0, -2, 0]} />
+
       <Environment preset="night" />
 
-      {/* Allow gentle rotation on desktop (disabled on mobile for performance) */}
-      <OrbitControls
-        enableZoom={false}
-        enablePan={false}
-        autoRotate={false}
-        maxPolarAngle={Math.PI / 2}
-        minPolarAngle={Math.PI / 2}
-      />
+      {/* Disable orbit controls for gameplay */}
+      <OrbitControls enabled={false} />
     </Canvas>
   )
 }

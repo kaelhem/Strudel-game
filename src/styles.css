@@ -11,11 +11,11 @@ html, body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto',
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: #000;
 }
 
 #root {
@@ -51,107 +51,163 @@ html, body {
   transform: translate(-50%, -50%);
   text-align: center;
   pointer-events: all;
+  animation: fadeIn 0.5s ease;
 }
 
 .title {
-  font-size: 3rem;
+  font-size: 4rem;
   font-weight: 900;
   color: #fff;
   margin-bottom: 1rem;
-  text-shadow: 0 0 20px rgba(131, 56, 236, 0.8);
-  letter-spacing: -0.05em;
+  text-shadow: 0 0 30px rgba(0, 212, 255, 0.8),
+               0 0 60px rgba(0, 212, 255, 0.5);
+  letter-spacing: 0.1em;
+  background: linear-gradient(135deg, #00d4ff, #ff00ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .subtitle {
-  font-size: 1.2rem;
-  color: #ccc;
+  font-size: 1.3rem;
+  color: #aaa;
   margin-bottom: 2rem;
-  opacity: 0.8;
+  opacity: 0.9;
+}
+
+.instructions {
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 15px;
+  border: 1px solid rgba(0, 212, 255, 0.3);
+}
+
+.instructions p {
+  font-size: 1.1rem;
+  color: #00d4ff;
+  margin: 0.5rem 0;
+  font-weight: 500;
 }
 
 .start-button,
 .restart-button {
-  padding: 1rem 3rem;
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #fff;
-  background: linear-gradient(135deg, #8338ec 0%, #fb5607 100%);
+  padding: 1.2rem 4rem;
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: #000;
+  background: linear-gradient(135deg, #00d4ff 0%, #ff00ff 100%);
   border: none;
   border-radius: 50px;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 20px rgba(131, 56, 236, 0.5);
+  box-shadow: 0 4px 30px rgba(0, 212, 255, 0.6),
+              0 0 50px rgba(255, 0, 255, 0.4);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.15em;
+  animation: pulse 2s ease-in-out infinite;
 }
 
 .start-button:hover,
 .restart-button:hover {
   transform: scale(1.05);
-  box-shadow: 0 6px 30px rgba(131, 56, 236, 0.7);
+  box-shadow: 0 6px 40px rgba(0, 212, 255, 0.8),
+              0 0 70px rgba(255, 0, 255, 0.6);
 }
 
 .start-button:active,
 .restart-button:active {
-  transform: scale(0.98);
+  transform: scale(0.95);
 }
 
-/* Score Container */
-.score-container {
+/* HUD Top */
+.hud-top {
   position: absolute;
   top: 2rem;
   left: 50%;
   transform: translateX(-50%);
-  text-align: center;
+  display: flex;
+  gap: 3rem;
+  align-items: center;
 }
 
-.score {
-  font-size: 2rem;
-  font-weight: 700;
-  color: #fff;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
-  margin-bottom: 0.5rem;
+.score-display,
+.combo-display {
+  text-align: center;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 1rem 2rem;
+  border-radius: 15px;
+  border: 2px solid rgba(0, 212, 255, 0.5);
+  backdrop-filter: blur(10px);
+}
+
+.score-label,
+.combo-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #00d4ff;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.3rem;
 }
 
 .score-value {
-  color: #ffbe0b;
   font-size: 2.5rem;
-}
-
-.combo {
-  font-size: 1.5rem;
-  font-weight: 600;
+  font-weight: 900;
   color: #fff;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 0 20px rgba(0, 212, 255, 0.8);
 }
 
 .combo-value {
-  color: #ff006e;
-  font-size: 2rem;
-  animation: pulse 0.3s ease;
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: #ff00ff;
+  text-shadow: 0 0 20px rgba(255, 0, 255, 0.8);
+  animation: comboScale 0.3s ease;
 }
 
-/* Beat Indicator */
-.beat-indicator-container {
+.combo-display.super {
+  border-color: rgba(255, 0, 255, 0.8);
+  box-shadow: 0 0 30px rgba(255, 0, 255, 0.5);
+}
+
+.combo-display.mega {
+  border-color: rgba(255, 0, 110, 1);
+  box-shadow: 0 0 40px rgba(255, 0, 110, 0.7);
+  animation: megaShake 0.5s ease;
+}
+
+/* Tap Hint */
+.tap-hint {
   position: absolute;
-  bottom: 4rem;
+  bottom: 8rem;
   left: 50%;
   transform: translateX(-50%);
-}
-
-.beat-indicator {
-  font-size: 3rem;
+  font-size: 4rem;
   font-weight: 900;
-  color: rgba(255, 255, 255, 0.2);
-  text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
-  transition: all 0.1s ease;
-  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.3);
+  text-shadow: 0 0 30px rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.2em;
+  animation: tapPulse 1s ease-in-out infinite;
 }
 
-.beat-indicator.active {
-  color: rgba(255, 255, 255, 1);
-  text-shadow: 0 0 40px rgba(255, 255, 255, 0.9);
-  transform: scale(1.2);
+/* Stats Bottom */
+.stats-bottom {
+  position: absolute;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 2rem;
+  font-size: 1.1rem;
+  color: #aaa;
+  font-weight: 600;
+}
+
+.stats-bottom span {
+  background: rgba(0, 0, 0, 0.5);
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 /* Game Over Screen */
@@ -163,28 +219,88 @@ html, body {
   text-align: center;
   pointer-events: all;
   animation: fadeIn 0.5s ease;
+  width: 90%;
+  max-width: 500px;
 }
 
 .game-over-title {
-  font-size: 3rem;
+  font-size: 3.5rem;
   font-weight: 900;
   color: #fff;
-  margin-bottom: 1rem;
-  text-shadow: 0 0 20px rgba(255, 0, 110, 0.8);
+  margin-bottom: 2rem;
+  text-shadow: 0 0 30px rgba(0, 255, 0, 0.8);
+  background: linear-gradient(135deg, #00ff00, #00d4ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-.final-score {
-  font-size: 2rem;
-  color: #ffbe0b;
+.final-stats {
+  background: rgba(0, 0, 0, 0.8);
+  padding: 2rem;
+  border-radius: 20px;
+  border: 2px solid rgba(0, 212, 255, 0.5);
   margin-bottom: 2rem;
-  font-weight: 700;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(15px);
+}
+
+.stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 1rem 0;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+
+.stat-label {
+  font-size: 1.2rem;
+  color: #00d4ff;
+  font-weight: 600;
+}
+
+.stat-value {
+  font-size: 2rem;
+  color: #fff;
+  font-weight: 900;
+  text-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+}
+
+.stat-breakdown {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: space-around;
+  font-size: 1rem;
+  color: #aaa;
 }
 
 /* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
 @keyframes pulse {
-  0% {
+  0%, 100% {
     transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes comboScale {
+  0% {
+    transform: scale(0.8);
   }
   50% {
     transform: scale(1.2);
@@ -194,14 +310,26 @@ html, body {
   }
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.9);
+@keyframes megaShake {
+  0%, 100% {
+    transform: translateX(0);
   }
-  to {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
+  25% {
+    transform: translateX(-5px);
+  }
+  75% {
+    transform: translateX(5px);
+  }
+}
+
+@keyframes tapPulse {
+  0%, 100% {
+    opacity: 0.2;
+    transform: translateX(-50%) scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: translateX(-50%) scale(1.1);
   }
 }
 
@@ -215,38 +343,44 @@ html, body {
     font-size: 1rem;
   }
 
+  .instructions p {
+    font-size: 0.9rem;
+  }
+
   .start-button,
   .restart-button {
-    padding: 0.8rem 2rem;
-    font-size: 1.2rem;
+    padding: 1rem 2.5rem;
+    font-size: 1.3rem;
   }
 
-  .score {
-    font-size: 1.5rem;
-  }
-
-  .score-value {
-    font-size: 2rem;
-  }
-
-  .combo {
-    font-size: 1.2rem;
-  }
-
+  .score-value,
   .combo-value {
-    font-size: 1.5rem;
+    font-size: 2rem;
   }
 
-  .beat-indicator {
-    font-size: 2rem;
+  .tap-hint {
+    font-size: 3rem;
   }
 
   .game-over-title {
-    font-size: 2rem;
+    font-size: 2.5rem;
   }
 
-  .final-score {
+  .stat-label {
+    font-size: 1rem;
+  }
+
+  .stat-value {
     font-size: 1.5rem;
+  }
+
+  .hud-top {
+    gap: 1rem;
+  }
+
+  .stats-bottom {
+    flex-direction: column;
+    gap: 0.5rem;
   }
 }
 
