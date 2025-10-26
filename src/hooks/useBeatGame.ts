@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import * as Tone from 'tone'
+import { repl } from '@strudel/core'
 
-const GAME_DURATION = 45000 // 45 seconds
-const TAP_TOLERANCE = 150 // ±150ms for perfect hit
-const BPM = 110
+const GAME_DURATION = 60000 // 60 seconds per level
+const TAP_TOLERANCE = 200 // ±200ms for perfect hit (more forgiving)
+const BASE_BPM = 95 // Slower, more manageable tempo
 
 export enum NoteType {
   TAP = 'TAP',
@@ -32,7 +33,11 @@ export interface BeatGameState {
   perfectHits: number
   goodHits: number
   missedHits: number
+  level: number
+  musicStyle: string
 }
+
+type MusicStyle = 'techno' | 'hiphop' | 'ambient' | 'funk' | 'dnb'
 
 export function useBeatGame() {
   const [state, setState] = useState<BeatGameState>({
@@ -44,7 +49,9 @@ export function useBeatGame() {
     notes: [],
     perfectHits: 0,
     goodHits: 0,
-    missedHits: 0
+    missedHits: 0,
+    level: 1,
+    musicStyle: 'techno'
   })
 
   const audioInitializedRef = useRef(false)
@@ -53,156 +60,111 @@ export function useBeatGame() {
   const loopRef = useRef<Tone.Loop | null>(null)
   const lastTapTimeRef = useRef<number>(0)
   const touchStartRef = useRef<{ x: number; y: number } | null>(null)
+  const strudelRef = useRef<any>(null)
 
-  // Audio instruments
-  const kickRef = useRef<Tone.MembraneSynth | null>(null)
-  const snareRef = useRef<Tone.NoiseSynth | null>(null)
-  const clapRef = useRef<Tone.NoiseSynth | null>(null)
-  const hihatRef = useRef<Tone.MetalSynth | null>(null)
+  // Only keep hit feedback synth - Strudel will handle music
+  const hitSynthRef = useRef<Tone.Synth | null>(null)
 
-  // Initialize audio with LOUD sounds
+  // Get Strudel pattern based on music style
+  const getMusicPattern = useCallback((style: MusicStyle) => {
+    switch (style) {
+      case 'techno':
+        return `
+          stack(
+            s("bd:3").every(4, x => x.fast(2)),
+            s("~ hh:2 ~ hh:2").gain(0.5),
+            s("~ ~ sd:4 ~").gain(0.7),
+            note("c2 ~ g1 ~").s("sawtooth").lpf(800).room(0.5)
+          ).cpm(${BASE_BPM})
+        `
+      case 'hiphop':
+        return `
+          stack(
+            s("bd:5 ~ ~ bd:5 ~ bd:5 ~ ~"),
+            s("~ ~ sd:8 ~").gain(0.8),
+            s("~ hh:3 ~ hh:3").gain(0.4),
+            note("<c3 eb3 f3 g3>").s("triangle").lpf(1200).delay(0.25).room(0.3)
+          ).cpm(${BASE_BPM})
+        `
+      case 'ambient':
+        return `
+          stack(
+            s("bd:1 ~ ~ ~ ~ ~ ~ ~").gain(0.5),
+            note("<a2 c3 e3 g3>/4").s("sine").lpf(600).delay(0.5).room(0.9).gain(0.6),
+            note("<e4 g4 a4 c5>/8").s("triangle").delay(0.375).room(0.8).gain(0.4)
+          ).cpm(${BASE_BPM * 0.7})
+        `
+      case 'funk':
+        return `
+          stack(
+            s("bd:6 ~ bd:6 ~ ~ bd:6 ~ ~"),
+            s("~ ~ sd:6 ~ ~ sd:6 ~ ~").gain(0.7),
+            s("~ hh:5 ~ hh:5 ~ hh:5 ~ hh:5").gain(0.5),
+            note("<c3 d3 f3 g3>*2").s("sawtooth").lpf(1000).room(0.4)
+          ).cpm(${BASE_BPM * 1.1})
+        `
+      case 'dnb':
+        return `
+          stack(
+            s("bd:4 ~ ~ ~ bd:4 ~ ~ ~"),
+            s("~ sd:7 ~ sd:7 ~ sd:7 sd:7 ~").gain(0.6).fast(2),
+            s("hh:6*8").gain(0.4),
+            note("<d2 f2 a2 c3>/2").s("sawtooth").lpf(900).room(0.5)
+          ).cpm(${BASE_BPM * 1.6})
+        `
+    }
+  }, [])
+
+  // Initialize audio
   const initAudio = useCallback(async () => {
     if (audioInitializedRef.current) return
 
     try {
-      console.log('🔊 Initializing Tone.js...')
+      console.log('🔊 Initializing audio...')
       await Tone.start()
 
       // Set master volume
-      Tone.getDestination().volume.value = 0 // 0 dB = loud!
+      Tone.getDestination().volume.value = -3 // Slightly quieter than before
 
-      console.log('🔊 Creating instruments...')
+      // Initialize Strudel
+      console.log('🎹 Initializing Strudel...')
+      strudelRef.current = repl()
 
-      // Kick drum - LOUD
-      kickRef.current = new Tone.MembraneSynth({
-        pitchDecay: 0.05,
-        octaves: 10,
+      // Create hit feedback synth
+      hitSynthRef.current = new Tone.Synth({
         oscillator: { type: 'sine' },
-        envelope: {
-          attack: 0.001,
-          decay: 0.4,
-          sustain: 0.01,
-          release: 1.4
-        }
+        envelope: { attack: 0.001, decay: 0.15, sustain: 0, release: 0.15 }
       }).toDestination()
-      kickRef.current.volume.value = 6 // Extra loud
-
-      // Snare drum - LOUD
-      snareRef.current = new Tone.NoiseSynth({
-        noise: { type: 'white' },
-        envelope: {
-          attack: 0.001,
-          decay: 0.2,
-          sustain: 0
-        }
-      }).toDestination()
-      snareRef.current.volume.value = 3
-
-      // Clap - LOUD
-      clapRef.current = new Tone.NoiseSynth({
-        noise: { type: 'pink' },
-        envelope: {
-          attack: 0.001,
-          decay: 0.15,
-          sustain: 0
-        }
-      }).toDestination()
-      clapRef.current.volume.value = 3
-
-      // Hi-hat - LOUD
-      hihatRef.current = new Tone.MetalSynth({
-        envelope: {
-          attack: 0.001,
-          decay: 0.1,
-          release: 0.01
-        },
-        harmonicity: 5.1,
-        modulationIndex: 32,
-        resonance: 4000,
-        octaves: 1.5
-      }).toDestination()
-      hihatRef.current.volume.value = 0
+      hitSynthRef.current.volume.value = 0
 
       audioInitializedRef.current = true
-
-      // PLAY A TEST SOUND immediately
-      console.log('🔊 Playing test sounds...')
-      kickRef.current.triggerAttackRelease('C1', '8n')
-
-      setTimeout(() => {
-        snareRef.current?.triggerAttackRelease('8n')
-      }, 250)
-
-      setTimeout(() => {
-        hihatRef.current?.triggerAttackRelease(200, '16n')
-      }, 500)
-
-      console.log('✅ Audio initialized and test played!')
+      console.log('✅ Audio initialized!')
     } catch (error) {
       console.error('❌ Failed to initialize audio:', error)
     }
+  }, [getMusicPattern])
+
+  // Get note types based on level difficulty
+  const getNoteTypesForLevel = useCallback((level: number): NoteType[] => {
+    if (level === 1) return [NoteType.TAP]
+    if (level === 2) return [NoteType.TAP, NoteType.SWIPE_LEFT, NoteType.SWIPE_RIGHT]
+    if (level === 3) return [NoteType.TAP, NoteType.DOUBLE_TAP, NoteType.SWIPE_LEFT, NoteType.SWIPE_RIGHT, NoteType.SWIPE_UP, NoteType.SWIPE_DOWN]
+    return [NoteType.TAP, NoteType.DOUBLE_TAP, NoteType.SWIPE_LEFT, NoteType.SWIPE_RIGHT, NoteType.SWIPE_UP, NoteType.SWIPE_DOWN]
   }, [])
 
-  // Play beat sound based on note type
-  const playBeat = useCallback((noteType: NoteType) => {
-    const now = Tone.now()
-
-    console.log(`🎵 Playing sound for ${noteType}`)
-
-    switch (noteType) {
-      case NoteType.TAP:
-        kickRef.current?.triggerAttackRelease('C1', '8n', now)
-        break
-      case NoteType.DOUBLE_TAP:
-        kickRef.current?.triggerAttackRelease('C1', '16n', now)
-        setTimeout(() => {
-          kickRef.current?.triggerAttackRelease('C1', '16n', Tone.now())
-        }, 100)
-        break
-      case NoteType.SWIPE_LEFT:
-        snareRef.current?.triggerAttackRelease('16n', now)
-        break
-      case NoteType.SWIPE_RIGHT:
-        clapRef.current?.triggerAttackRelease('16n', now)
-        break
-      case NoteType.SWIPE_UP:
-        hihatRef.current?.triggerAttackRelease(200, '32n', now)
-        break
-      case NoteType.SWIPE_DOWN:
-        snareRef.current?.triggerAttackRelease('8n', now)
-        break
-    }
-  }, [])
-
-  // Create varied beat pattern
-  const createBeatPattern = useCallback(() => {
-    // Pattern: not every beat, varied rhythm
-    const pattern = [
-      NoteType.TAP,
-      null,
-      NoteType.SWIPE_LEFT,
-      null,
-      NoteType.TAP,
-      NoteType.DOUBLE_TAP,
-      null,
-      NoteType.SWIPE_RIGHT,
-      null,
-      null,
-      NoteType.SWIPE_UP,
-      null,
-      NoteType.TAP,
-      null,
-      NoteType.SWIPE_DOWN,
-      null
-    ]
-
-    return pattern
+  // Get random music style
+  const getRandomMusicStyle = useCallback((): MusicStyle => {
+    const styles: MusicStyle[] = ['techno', 'hiphop', 'ambient', 'funk', 'dnb']
+    return styles[Math.floor(Math.random() * styles.length)]
   }, [])
 
   // Start the game
-  const startGame = useCallback(async () => {
-    console.log('🎮 Starting game...')
+  const startGame = useCallback(async (level: number = 1) => {
+    console.log(`🎮 Starting game Level ${level}...`)
     await initAudio()
+
+    const musicStyle = getRandomMusicStyle()
+    const allowedNoteTypes = getNoteTypesForLevel(level)
 
     // Reset state
     setState({
@@ -214,25 +176,34 @@ export function useBeatGame() {
       notes: [],
       perfectHits: 0,
       goodHits: 0,
-      missedHits: 0
+      missedHits: 0,
+      level,
+      musicStyle
     })
 
     noteIdCounterRef.current = 0
     gameStartTimeRef.current = performance.now()
 
-    const pattern = createBeatPattern()
-    let beatIndex = 0
+    // Start Strudel music in background
+    try {
+      const pattern = getMusicPattern(musicStyle)
+      console.log('🎵 Starting Strudel pattern:', musicStyle)
+      await strudelRef.current?.evaluate(pattern)
+    } catch (error) {
+      console.error('❌ Failed to start Strudel:', error)
+    }
 
-    // Create beat loop with VARIED pattern
+    let beatCount = 0
+    // Spawn interval based on level: Level 1 = every 8 beats, Level 2 = every 6, Level 3+ = every 4
+    const spawnInterval = level === 1 ? 8 : level === 2 ? 6 : 4
+
+    // Create note spawning loop - only spawn on certain beats
     loopRef.current = new Tone.Loop((time) => {
-      const noteType = pattern[beatIndex % pattern.length]
-      beatIndex++
+      beatCount++
 
-      if (noteType !== null) {
-        // Play sound
-        Tone.Draw.schedule(() => {
-          playBeat(noteType)
-        }, time)
+      // Only spawn a note every N beats
+      if (beatCount % spawnInterval === 0) {
+        const noteType = allowedNoteTypes[Math.floor(Math.random() * allowedNoteTypes.length)]
 
         // Add note for player to hit
         Tone.Draw.schedule(() => {
@@ -248,6 +219,7 @@ export function useBeatGame() {
             ...prev,
             notes: [...prev.notes, newNote]
           }))
+          console.log(`📍 Note spawned: ${noteType}`)
         }, time)
       }
 
@@ -257,20 +229,27 @@ export function useBeatGame() {
         loopRef.current?.stop()
         Tone.Transport.stop()
 
+        // Stop Strudel
+        try {
+          strudelRef.current?.scheduler?.stop()
+        } catch (error) {
+          console.error('Error stopping Strudel:', error)
+        }
+
         setState(prev => ({
           ...prev,
           isPlaying: false,
           gameOver: true
         }))
       }
-    }, `8n`) // Eighth note
+    }, `8n`) // Eighth note beat
 
     loopRef.current.start(0)
-    Tone.Transport.bpm.value = BPM
+    Tone.Transport.bpm.value = BASE_BPM
     Tone.Transport.start()
 
-    console.log('✅ Game loop started at', BPM, 'BPM')
-  }, [initAudio, createBeatPattern, playBeat])
+    console.log(`✅ Game started - Level ${level}, Style: ${musicStyle}, BPM: ${BASE_BPM}`)
+  }, [initAudio, getMusicPattern, getRandomMusicStyle, getNoteTypesForLevel])
 
   // Stop the game
   const stopGame = useCallback(() => {
@@ -281,6 +260,13 @@ export function useBeatGame() {
     }
 
     Tone.Transport.stop()
+
+    // Stop Strudel
+    try {
+      strudelRef.current?.scheduler?.stop()
+    } catch (error) {
+      console.error('Error stopping Strudel:', error)
+    }
 
     setState(prev => ({
       ...prev,
@@ -350,19 +336,20 @@ export function useBeatGame() {
       return
     }
 
-    // Find closest note
+    // Find closest note (notes take 3.5 seconds to reach target)
+    const NOTE_TRAVEL_TIME = 3500
     let closestNote = activeNotes[0]
-    let minDiff = Math.abs((now - closestNote.timestamp) - 2000)
+    let minDiff = Math.abs((now - closestNote.timestamp) - NOTE_TRAVEL_TIME)
 
     activeNotes.forEach(note => {
-      const diff = Math.abs((now - note.timestamp) - 2000)
+      const diff = Math.abs((now - note.timestamp) - NOTE_TRAVEL_TIME)
       if (diff < minDiff) {
         minDiff = diff
         closestNote = note
       }
     })
 
-    const timingDiff = Math.abs((now - closestNote.timestamp) - 2000)
+    const timingDiff = Math.abs((now - closestNote.timestamp) - NOTE_TRAVEL_TIME)
 
     if (timingDiff <= TAP_TOLERANCE) {
       // HIT!
@@ -383,15 +370,9 @@ export function useBeatGame() {
         )
       }))
 
-      // Play hit sound
-      const hitSynth = new Tone.Synth({
-        oscillator: { type: 'sine' },
-        envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.1 }
-      }).toDestination()
-
-      const frequency = timingDiff < 50 ? 'C6' : 'E5'
-      hitSynth.triggerAttackRelease(frequency, '16n')
-      setTimeout(() => hitSynth.dispose(), 200)
+      // Play hit feedback sound
+      const frequency = timingDiff < 50 ? 'C6' : timingDiff < 100 ? 'A5' : 'E5'
+      hitSynthRef.current?.triggerAttackRelease(frequency, '16n')
 
       console.log(`✅ HIT ${gesture}! Timing: ${timingDiff}ms, Points: ${totalPoints}`)
     } else {
@@ -405,12 +386,16 @@ export function useBeatGame() {
   useEffect(() => {
     if (!state.isPlaying) return
 
+    const NOTE_TRAVEL_TIME = 3500
+    const MISS_THRESHOLD = NOTE_TRAVEL_TIME + 200
+    const CLEANUP_THRESHOLD = NOTE_TRAVEL_TIME + 1000
+
     const interval = setInterval(() => {
       const now = performance.now()
 
       setState(prev => {
         const updatedNotes = prev.notes.map(note => {
-          if (!note.hit && !note.missed && (now - note.timestamp) > 2200) {
+          if (!note.hit && !note.missed && (now - note.timestamp) > MISS_THRESHOLD) {
             return { ...note, missed: true }
           }
           return note
@@ -420,7 +405,7 @@ export function useBeatGame() {
 
         return {
           ...prev,
-          notes: updatedNotes.filter(n => (now - n.timestamp) < 3000),
+          notes: updatedNotes.filter(n => (now - n.timestamp) < CLEANUP_THRESHOLD),
           missedHits: newMissCount > 0 ? prev.missedHits + newMissCount : prev.missedHits,
           combo: newMissCount > 0 ? 0 : prev.combo
         }

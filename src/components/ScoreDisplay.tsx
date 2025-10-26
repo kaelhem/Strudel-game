@@ -7,6 +7,8 @@ interface ScoreDisplayProps {
   perfectHits: number
   goodHits: number
   missedHits: number
+  level: number
+  musicStyle: string
   onStart: () => void
   onRestart: () => void
 }
@@ -20,6 +22,8 @@ export function ScoreDisplay({
   perfectHits,
   goodHits,
   missedHits,
+  level,
+  musicStyle,
   onStart,
   onRestart
 }: ScoreDisplayProps) {
@@ -31,24 +35,24 @@ export function ScoreDisplay({
     <div className="score-overlay">
       {!isPlaying && !gameOver && (
         <div className="start-screen">
-          <h1 className="title">TAP BEAT RUSH</h1>
+          <h1 className="title">TAP MY STRUDEL</h1>
           <p className="subtitle">Match the gesture when circles reach the target!</p>
           <div className="instructions">
             <div className="instruction-row">
-              <span className="icon tap">⊙</span> Tap
+              <span className="icon tap">TAP</span> Single Tap
             </div>
             <div className="instruction-row">
-              <span className="icon double">⊙⊙</span> Double Tap
+              <span className="icon double">x2</span> Double Tap
             </div>
             <div className="instruction-row">
-              <span className="icon swipe-left">←</span> Swipe Left
-              <span className="icon swipe-right">→</span> Swipe Right
+              <span className="icon swipe-left">&lt;</span> Swipe Left
+              <span className="icon swipe-right">&gt;</span> Swipe Right
             </div>
             <div className="instruction-row">
-              <span className="icon swipe-up">↑</span> Swipe Up
-              <span className="icon swipe-down">↓</span> Swipe Down
+              <span className="icon swipe-up">^</span> Swipe Up
+              <span className="icon swipe-down">v</span> Swipe Down
             </div>
-            <p className="timing-info">Perfect: &lt;50ms • Good: &lt;150ms</p>
+            <p className="timing-info">Perfect: &lt;50ms • Good: &lt;200ms • Procedural music by Strudel</p>
           </div>
           <button className="start-button" onClick={onStart}>
             START GAME
@@ -62,6 +66,11 @@ export function ScoreDisplay({
             <div className="score-display">
               <div className="score-label">SCORE</div>
               <div className="score-value">{score}</div>
+            </div>
+
+            <div className="level-display">
+              <div className="level-label">LEVEL {level}</div>
+              <div className="style-label">{musicStyle.toUpperCase()}</div>
             </div>
 
             {combo > 0 && (
