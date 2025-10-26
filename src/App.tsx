@@ -23,26 +23,34 @@ function App() {
   } = useBeatGame()
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    // Only handle game inputs when playing
+    if (!isPlaying) return
     e.preventDefault()
     onTouchStart(e.clientX, e.clientY)
-  }, [onTouchStart])
+  }, [onTouchStart, isPlaying])
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    // Only handle game inputs when playing
+    if (!isPlaying) return
     e.preventDefault()
     onTouchEnd(e.clientX, e.clientY)
-  }, [onTouchEnd])
+  }, [onTouchEnd, isPlaying])
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    // Only handle game inputs when playing
+    if (!isPlaying) return
     e.preventDefault()
     const touch = e.touches[0]
     onTouchStart(touch.clientX, touch.clientY)
-  }, [onTouchStart])
+  }, [onTouchStart, isPlaying])
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    // Only handle game inputs when playing
+    if (!isPlaying) return
     e.preventDefault()
     const touch = e.changedTouches[0]
     onTouchEnd(touch.clientX, touch.clientY)
-  }, [onTouchEnd])
+  }, [onTouchEnd, isPlaying])
 
   const handleRestart = useCallback(() => {
     stopGame()

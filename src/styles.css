@@ -52,6 +52,9 @@ html, body {
   text-align: center;
   pointer-events: all;
   animation: fadeIn 0.5s ease;
+  max-height: 95vh;
+  overflow-y: auto;
+  padding: 1rem;
 }
 
 .title {
@@ -384,51 +387,81 @@ html, body {
 /* Mobile Optimizations */
 @media (max-width: 768px) {
   .title {
-    font-size: 2.5rem;
+    font-size: 2rem;
   }
 
   .subtitle {
-    font-size: 1rem;
+    font-size: 0.9rem;
   }
 
-  .instructions p {
+  .instructions {
+    padding: 1rem;
+    max-width: 90vw;
+  }
+
+  .instruction-row {
     font-size: 0.9rem;
+    margin: 0.5rem 0;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .icon {
+    font-size: 1.3rem;
+    padding: 0.2rem 0.4rem;
+  }
+
+  .timing-info {
+    font-size: 0.75rem;
+    margin-top: 1rem;
   }
 
   .start-button,
   .restart-button {
-    padding: 1rem 2.5rem;
-    font-size: 1.3rem;
+    padding: 1rem 2rem;
+    font-size: 1.2rem;
   }
 
   .score-value,
   .combo-value {
-    font-size: 2rem;
+    font-size: 1.8rem;
   }
 
-  .tap-hint {
-    font-size: 3rem;
+  .score-display,
+  .combo-display {
+    padding: 0.7rem 1.2rem;
   }
 
   .game-over-title {
-    font-size: 2.5rem;
+    font-size: 2rem;
   }
 
   .stat-label {
-    font-size: 1rem;
+    font-size: 0.9rem;
   }
 
   .stat-value {
-    font-size: 1.5rem;
+    font-size: 1.3rem;
+  }
+
+  .final-stats {
+    padding: 1.5rem;
   }
 
   .hud-top {
-    gap: 1rem;
+    gap: 0.7rem;
+    top: 1rem;
   }
 
   .stats-bottom {
-    flex-direction: column;
+    flex-direction: row;
     gap: 0.5rem;
+    font-size: 0.85rem;
+    bottom: 1rem;
+  }
+
+  .stats-bottom span {
+    padding: 0.4rem 0.7rem;
   }
 }
 
