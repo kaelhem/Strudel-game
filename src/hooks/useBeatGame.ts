@@ -109,6 +109,12 @@ export function useBeatGame() {
         })
 
       schedulerRef.current = pattern.webaudio()
+
+      // Start the scheduler
+      if (schedulerRef.current && schedulerRef.current.start) {
+        schedulerRef.current.start()
+        console.log('Strudel pattern enriched and restarted')
+      }
     }
   }, [stopGame])
 
@@ -167,6 +173,12 @@ export function useBeatGame() {
         })
 
       schedulerRef.current = pattern.webaudio()
+
+      // Start the scheduler
+      if (schedulerRef.current && schedulerRef.current.start) {
+        schedulerRef.current.start()
+        console.log('Strudel pattern started')
+      }
     } catch (error) {
       console.error('Failed to start pattern:', error)
     }
