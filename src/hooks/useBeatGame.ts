@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import * as Tone from 'tone'
-import { repl } from '@strudel/core'
 
 const GAME_DURATION = 60000 // 60 seconds per level
 const TAP_TOLERANCE = 200 // ±200ms for perfect hit (more forgiving)
-const BASE_BPM = 95 // Slower, more manageable tempo
+const BASE_BPM = 110 // Good rhythm tempo
 
 export enum NoteType {
   TAP = 'TAP',
@@ -60,59 +59,68 @@ export function useBeatGame() {
   const loopRef = useRef<Tone.Loop | null>(null)
   const lastTapTimeRef = useRef<number>(0)
   const touchStartRef = useRef<{ x: number; y: number } | null>(null)
-  const strudelRef = useRef<any>(null)
+  const musicPartsRef = useRef<Tone.Part[]>([])
 
-  // Only keep hit feedback synth - Strudel will handle music
+  // Audio instruments
+  const synthRef = useRef<Tone.PolySynth | null>(null)
+  const bassRef = useRef<Tone.MonoSynth | null>(null)
+  const kickRef = useRef<Tone.MembraneSynth | null>(null)
+  const snareRef = useRef<Tone.NoiseSynth | null>(null)
+  const hihatRef = useRef<Tone.MetalSynth | null>(null)
   const hitSynthRef = useRef<Tone.Synth | null>(null)
 
-  // Get Strudel pattern based on music style
-  const getMusicPattern = useCallback((style: MusicStyle) => {
+  // Create music sequences based on style
+  const createMusicSequences = useCallback((style: MusicStyle) => {
+    const sequences: any = { drums: [], bass: [], melody: [] }
+
     switch (style) {
       case 'techno':
-        return `
-          stack(
-            s("bd:3").every(4, x => x.fast(2)),
-            s("~ hh:2 ~ hh:2").gain(0.5),
-            s("~ ~ sd:4 ~").gain(0.7),
-            note("c2 ~ g1 ~").s("sawtooth").lpf(800).room(0.5)
-          ).cpm(${BASE_BPM})
-        `
+        // 4-on-floor kick
+        sequences.drums = [[0, 'kick'], [1, 'hihat'], [2, 'kick'], [2, 'snare'], [3, 'hihat']]
+        // Pulsing bass
+        sequences.bass = [[0, 'C2'], [2, 'G1'], [2.5, 'C2']]
+        // Arpeggiated melody
+        sequences.melody = [[0, 'C4'], [0.5, 'E4'], [1, 'G4'], [1.5, 'C5'], [2, 'G4'], [2.5, 'E4'], [3, 'C4'], [3.5, 'G3']]
+        break
+
       case 'hiphop':
-        return `
-          stack(
-            s("bd:5 ~ ~ bd:5 ~ bd:5 ~ ~"),
-            s("~ ~ sd:8 ~").gain(0.8),
-            s("~ hh:3 ~ hh:3").gain(0.4),
-            note("<c3 eb3 f3 g3>").s("triangle").lpf(1200).delay(0.25).room(0.3)
-          ).cpm(${BASE_BPM})
-        `
+        // Hip-hop beat
+        sequences.drums = [[0, 'kick'], [1, 'snare'], [1.5, 'hihat'], [2, 'kick'], [2.5, 'kick'], [3, 'snare'], [3.75, 'hihat']]
+        // Low bass
+        sequences.bass = [[0, 'C2'], [2, 'F1'], [2.5, 'G1']]
+        // Sparse melody
+        sequences.melody = [[0, 'C4'], [1.5, 'Eb4'], [2.5, 'F4'], [3, 'G4']]
+        break
+
       case 'ambient':
-        return `
-          stack(
-            s("bd:1 ~ ~ ~ ~ ~ ~ ~").gain(0.5),
-            note("<a2 c3 e3 g3>/4").s("sine").lpf(600).delay(0.5).room(0.9).gain(0.6),
-            note("<e4 g4 a4 c5>/8").s("triangle").delay(0.375).room(0.8).gain(0.4)
-          ).cpm(${BASE_BPM * 0.7})
-        `
+        // Sparse drums
+        sequences.drums = [[0, 'kick']]
+        // Slow evolving bass
+        sequences.bass = [[0, 'A1'], [1, 'C2'], [2, 'E2'], [3, 'G2']]
+        // Ethereal melody
+        sequences.melody = [[0, 'E4'], [1, 'G4'], [2, 'A4'], [3, 'C5']]
+        break
+
       case 'funk':
-        return `
-          stack(
-            s("bd:6 ~ bd:6 ~ ~ bd:6 ~ ~"),
-            s("~ ~ sd:6 ~ ~ sd:6 ~ ~").gain(0.7),
-            s("~ hh:5 ~ hh:5 ~ hh:5 ~ hh:5").gain(0.5),
-            note("<c3 d3 f3 g3>*2").s("sawtooth").lpf(1000).room(0.4)
-          ).cpm(${BASE_BPM * 1.1})
-        `
+        // Funky syncopated drums
+        sequences.drums = [[0, 'kick'], [0.75, 'hihat'], [1, 'snare'], [1.5, 'hihat'], [2, 'kick'], [2.5, 'kick'], [3, 'snare'], [3.75, 'hihat']]
+        // Funky bass
+        sequences.bass = [[0, 'C2'], [0.5, 'C2'], [1, 'D2'], [2, 'F2'], [2.75, 'G2']]
+        // Staccato melody
+        sequences.melody = [[0, 'C4'], [0.5, 'D4'], [1, 'F4'], [2, 'G4'], [2.5, 'F4']]
+        break
+
       case 'dnb':
-        return `
-          stack(
-            s("bd:4 ~ ~ ~ bd:4 ~ ~ ~"),
-            s("~ sd:7 ~ sd:7 ~ sd:7 sd:7 ~").gain(0.6).fast(2),
-            s("hh:6*8").gain(0.4),
-            note("<d2 f2 a2 c3>/2").s("sawtooth").lpf(900).room(0.5)
-          ).cpm(${BASE_BPM * 1.6})
-        `
+        // Fast breakbeat
+        sequences.drums = [[0, 'kick'], [0.5, 'snare'], [0.75, 'hihat'], [1, 'snare'], [1.25, 'hihat'], [1.5, 'kick'], [2, 'snare'], [2.5, 'hihat'], [3, 'snare'], [3.75, 'hihat']]
+        // Wobbling bass
+        sequences.bass = [[0, 'D2'], [0.5, 'F2'], [1, 'A2'], [1.5, 'D2'], [2, 'C2']]
+        // Fast melody
+        sequences.melody = [[0, 'D4'], [0.25, 'F4'], [0.5, 'A4'], [1, 'C5'], [1.5, 'A4'], [2, 'F4']]
+        break
     }
+
+    return sequences
   }, [])
 
   // Initialize audio
@@ -120,29 +128,70 @@ export function useBeatGame() {
     if (audioInitializedRef.current) return
 
     try {
-      console.log('🔊 Initializing audio...')
+      console.log('🔊 Initializing Tone.js...')
       await Tone.start()
 
       // Set master volume
-      Tone.getDestination().volume.value = -3 // Slightly quieter than before
+      Tone.getDestination().volume.value = -6
 
-      // Initialize Strudel
-      console.log('🎹 Initializing Strudel...')
-      strudelRef.current = repl()
+      // Reverb and delay for ambience
+      const reverb = new Tone.Reverb({ decay: 2.5, wet: 0.3 }).toDestination()
+      const delay = new Tone.FeedbackDelay({ delayTime: 0.25, feedback: 0.3, wet: 0.2 }).connect(reverb)
 
-      // Create hit feedback synth
+      // Melody synth with effects
+      synthRef.current = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.02, decay: 0.1, sustain: 0.3, release: 0.8 }
+      }).connect(delay)
+      synthRef.current.volume.value = -8
+
+      // Bass synth
+      bassRef.current = new Tone.MonoSynth({
+        oscillator: { type: 'sawtooth' },
+        envelope: { attack: 0.01, decay: 0.3, sustain: 0.4, release: 0.8 },
+        filterEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.5, release: 0.5, baseFrequency: 200, octaves: 3 }
+      }).toDestination()
+      bassRef.current.volume.value = -8
+
+      // Kick
+      kickRef.current = new Tone.MembraneSynth({
+        pitchDecay: 0.05,
+        octaves: 10,
+        oscillator: { type: 'sine' },
+        envelope: { attack: 0.001, decay: 0.4, sustain: 0.01, release: 1.4 }
+      }).toDestination()
+      kickRef.current.volume.value = 0
+
+      // Snare
+      snareRef.current = new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: { attack: 0.001, decay: 0.2, sustain: 0 }
+      }).toDestination()
+      snareRef.current.volume.value = -6
+
+      // Hi-hat
+      hihatRef.current = new Tone.MetalSynth({
+        envelope: { attack: 0.001, decay: 0.1, release: 0.01 },
+        harmonicity: 5.1,
+        modulationIndex: 32,
+        resonance: 4000,
+        octaves: 1.5
+      }).toDestination()
+      hihatRef.current.volume.value = -10
+
+      // Hit feedback synth
       hitSynthRef.current = new Tone.Synth({
         oscillator: { type: 'sine' },
         envelope: { attack: 0.001, decay: 0.15, sustain: 0, release: 0.15 }
       }).toDestination()
-      hitSynthRef.current.volume.value = 0
+      hitSynthRef.current.volume.value = 3
 
       audioInitializedRef.current = true
       console.log('✅ Audio initialized!')
     } catch (error) {
       console.error('❌ Failed to initialize audio:', error)
     }
-  }, [getMusicPattern])
+  }, [])
 
   // Get note types based on level difficulty
   const getNoteTypesForLevel = useCallback((level: number): NoteType[] => {
@@ -184,14 +233,34 @@ export function useBeatGame() {
     noteIdCounterRef.current = 0
     gameStartTimeRef.current = performance.now()
 
-    // Start Strudel music in background
-    try {
-      const pattern = getMusicPattern(musicStyle)
-      console.log('🎵 Starting Strudel pattern:', musicStyle)
-      await strudelRef.current?.evaluate(pattern)
-    } catch (error) {
-      console.error('❌ Failed to start Strudel:', error)
-    }
+    // Start music sequences
+    const sequences = createMusicSequences(musicStyle)
+    console.log('🎵 Starting music:', musicStyle)
+
+    // Drum part
+    const drumPart = new Tone.Part((time, value) => {
+      if (value === 'kick') kickRef.current?.triggerAttackRelease('C1', '8n', time)
+      if (value === 'snare') snareRef.current?.triggerAttackRelease('16n', time)
+      if (value === 'hihat') hihatRef.current?.triggerAttackRelease(400, '32n', time)
+    }, sequences.drums).start(0)
+    drumPart.loop = true
+    drumPart.loopEnd = '1m'
+
+    // Bass part
+    const bassPart = new Tone.Part((time, note) => {
+      bassRef.current?.triggerAttackRelease(note, '8n', time)
+    }, sequences.bass).start(0)
+    bassPart.loop = true
+    bassPart.loopEnd = '1m'
+
+    // Melody part
+    const melodyPart = new Tone.Part((time, note) => {
+      synthRef.current?.triggerAttackRelease(note, '16n', time)
+    }, sequences.melody).start(0)
+    melodyPart.loop = true
+    melodyPart.loopEnd = '1m'
+
+    musicPartsRef.current = [drumPart, bassPart, melodyPart]
 
     let beatCount = 0
     // Spawn interval based on level: Level 1 = every 8 beats, Level 2 = every 6, Level 3+ = every 4
@@ -229,12 +298,12 @@ export function useBeatGame() {
         loopRef.current?.stop()
         Tone.Transport.stop()
 
-        // Stop Strudel
-        try {
-          strudelRef.current?.scheduler?.stop()
-        } catch (error) {
-          console.error('Error stopping Strudel:', error)
-        }
+        // Stop music parts
+        musicPartsRef.current.forEach(part => {
+          part.stop()
+          part.dispose()
+        })
+        musicPartsRef.current = []
 
         setState(prev => ({
           ...prev,
@@ -249,7 +318,7 @@ export function useBeatGame() {
     Tone.Transport.start()
 
     console.log(`✅ Game started - Level ${level}, Style: ${musicStyle}, BPM: ${BASE_BPM}`)
-  }, [initAudio, getMusicPattern, getRandomMusicStyle, getNoteTypesForLevel])
+  }, [initAudio, createMusicSequences, getRandomMusicStyle, getNoteTypesForLevel])
 
   // Stop the game
   const stopGame = useCallback(() => {
@@ -261,12 +330,12 @@ export function useBeatGame() {
 
     Tone.Transport.stop()
 
-    // Stop Strudel
-    try {
-      strudelRef.current?.scheduler?.stop()
-    } catch (error) {
-      console.error('Error stopping Strudel:', error)
-    }
+    // Stop music parts
+    musicPartsRef.current.forEach(part => {
+      part.stop()
+      part.dispose()
+    })
+    musicPartsRef.current = []
 
     setState(prev => ({
       ...prev,
