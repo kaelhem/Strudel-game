@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { Text } from '@react-three/drei'
@@ -15,60 +15,104 @@ const TARGET_Z = 0
 const START_Z = -15 // Start further away for longer travel
 
 function NoteCircle({ note, currentTime }: { note: Note; currentTime: number }) {
-  const meshRef = useRef<THREE.Mesh>(null)
+  const groupRef = useRef<THREE.Group>(null)
+  const ringRef = useRef<THREE.Mesh>(null)
+  const glowRef = useRef<THREE.Mesh>(null)
+  const trailPointsRef = useRef<THREE.Points>(null)
   const textRef = useRef<THREE.Mesh>(null)
   const elapsed = currentTime - note.timestamp
 
+  // Create trail particles
+  const trailParticles = useMemo(() => {
+    const count = 20
+    const positions = new Float32Array(count * 3)
+    const sizes = new Float32Array(count)
+
+    for (let i = 0; i < count; i++) {
+      positions[i * 3] = 0
+      positions[i * 3 + 1] = 0
+      positions[i * 3 + 2] = -i * 0.5
+      sizes[i] = (count - i) / count * 2
+    }
+
+    return { positions, sizes, count }
+  }, [])
+
   useFrame(() => {
-    if (!meshRef.current) return
+    if (!groupRef.current) return
 
     // Calculate position based on time
     const progress = Math.min(elapsed / NOTE_TRAVEL_TIME, 1)
     const z = START_Z + (TARGET_Z - START_Z) * progress
 
-    meshRef.current.position.z = z
-    if (textRef.current) textRef.current.position.z = z + 0.1
+    groupRef.current.position.z = z
+
+    // Rotation based on note type
+    if (ringRef.current) {
+      ringRef.current.rotation.z += 0.05
+    }
 
     // Scale animation
     if (note.hit) {
       const hitProgress = Math.min((elapsed - NOTE_TRAVEL_TIME) / 200, 1)
-      const scale = 1 + hitProgress * 3
-      meshRef.current.scale.setScalar(scale * (1 - hitProgress))
-      if (textRef.current) textRef.current.scale.setScalar(scale * (1 - hitProgress))
+      const scale = 1 + hitProgress * 4
+      const fade = 1 - hitProgress
+      groupRef.current.scale.setScalar(scale * fade)
+
+      // Explosion effect
+      if (glowRef.current) {
+        const material = glowRef.current.material as THREE.MeshBasicMaterial
+        material.opacity = fade * 0.8
+      }
+    } else if (note.missed) {
+      const fadeProgress = Math.min((elapsed - NOTE_TRAVEL_TIME) / 300, 1)
+      groupRef.current.scale.setScalar(1 - fadeProgress * 0.5)
+      if (glowRef.current) {
+        const material = glowRef.current.material as THREE.MeshBasicMaterial
+        material.opacity = 0.2 * (1 - fadeProgress)
+      }
     } else {
-      // Pulse slightly
-      const pulse = 1 + Math.sin(elapsed * 0.01) * 0.1
-      meshRef.current.scale.setScalar(pulse)
-      if (textRef.current) textRef.current.scale.setScalar(pulse)
+      // Pulse and breathe
+      const pulse = 1 + Math.sin(elapsed * 0.008) * 0.1
+      const grow = 1 + progress * 0.3
+      groupRef.current.scale.setScalar(pulse * grow)
+
+      // Glow intensity pulsing
+      if (glowRef.current) {
+        const material = glowRef.current.material as THREE.MeshBasicMaterial
+        material.opacity = 0.3 + Math.sin(elapsed * 0.01) * 0.2
+      }
     }
 
-    // Opacity
-    if (note.hit || note.missed) {
-      const fadeProgress = Math.min((elapsed - NOTE_TRAVEL_TIME) / 300, 1)
-      const material = meshRef.current.material as THREE.MeshStandardMaterial
-      material.opacity = 1 - fadeProgress
+    // Update trail
+    if (trailPointsRef.current && !note.hit && !note.missed) {
+      const positions = trailPointsRef.current.geometry.attributes.position.array as Float32Array
+      for (let i = 0; i < trailParticles.count; i++) {
+        positions[i * 3 + 2] = -i * 0.3 - elapsed * 0.01
+      }
+      trailPointsRef.current.geometry.attributes.position.needsUpdate = true
     }
   })
 
   const getColor = () => {
-    if (note.hit) return '#00ff00'
-    if (note.missed) return '#ff0000'
+    if (note.hit) return new THREE.Color('#00ff88')
+    if (note.missed) return new THREE.Color('#ff0044')
 
     switch (note.type) {
       case NoteType.TAP:
-        return '#ff006e'
+        return new THREE.Color('#ff006e')
       case NoteType.DOUBLE_TAP:
-        return '#ff8500'
+        return new THREE.Color('#ff8500')
       case NoteType.SWIPE_LEFT:
-        return '#00d4ff'
+        return new THREE.Color('#00d4ff')
       case NoteType.SWIPE_RIGHT:
-        return '#00ff88'
+        return new THREE.Color('#00ff88')
       case NoteType.SWIPE_UP:
-        return '#ffbe0b'
+        return new THREE.Color('#ffbe0b')
       case NoteType.SWIPE_DOWN:
-        return '#8338ec'
+        return new THREE.Color('#8338ec')
       default:
-        return '#00d4ff'
+        return new THREE.Color('#00d4ff')
     }
   }
 
@@ -91,22 +135,78 @@ function NoteCircle({ note, currentTime }: { note: Note; currentTime: number }) 
     }
   }
 
+  const color = getColor()
+
   return (
-    <group>
-      <mesh ref={meshRef} position={[0, 0, START_Z]}>
-        <ringGeometry args={[0.8, 1, 32]} />
-        <meshStandardMaterial
-          color={getColor()}
-          emissive={getColor()}
-          emissiveIntensity={note.hit ? 2 : note.missed ? 0.2 : 0.8}
+    <group ref={groupRef} position={[0, 0, START_Z]}>
+      {/* Outer glow */}
+      <mesh ref={glowRef}>
+        <ringGeometry args={[1.2, 1.8, 32]} />
+        <meshBasicMaterial
+          color={color}
           transparent
-          opacity={1}
+          opacity={0.3}
+          blending={THREE.AdditiveBlending}
+          side={THREE.DoubleSide}
         />
       </mesh>
+
+      {/* Main ring */}
+      <mesh ref={ringRef}>
+        <ringGeometry args={[0.7, 1, 32]} />
+        <meshBasicMaterial
+          color={color}
+          transparent
+          opacity={0.9}
+          blending={THREE.AdditiveBlending}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+
+      {/* Inner fill */}
+      <mesh position={[0, 0, -0.01]}>
+        <circleGeometry args={[0.7, 32]} />
+        <meshBasicMaterial
+          color={color}
+          transparent
+          opacity={0.2}
+        />
+      </mesh>
+
+      {/* Trail particles */}
+      {!note.hit && !note.missed && (
+        <points ref={trailPointsRef}>
+          <bufferGeometry>
+            <bufferAttribute
+              attach="attributes-position"
+              count={trailParticles.count}
+              array={trailParticles.positions}
+              itemSize={3}
+            />
+            <bufferAttribute
+              attach="attributes-size"
+              count={trailParticles.count}
+              array={trailParticles.sizes}
+              itemSize={1}
+            />
+          </bufferGeometry>
+          <pointsMaterial
+            size={1}
+            color={color}
+            transparent
+            opacity={0.6}
+            sizeAttenuation
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+          />
+        </points>
+      )}
+
+      {/* Text */}
       <Text
         ref={textRef}
-        position={[0, 0, START_Z + 0.1]}
-        fontSize={0.5}
+        position={[0, 0, 0.1]}
+        fontSize={0.4}
         color="white"
         anchorX="center"
         anchorY="middle"
@@ -118,20 +218,72 @@ function NoteCircle({ note, currentTime }: { note: Note; currentTime: number }) 
   )
 }
 
+function TargetZone() {
+  const ring1Ref = useRef<THREE.Mesh>(null)
+  const ring2Ref = useRef<THREE.Mesh>(null)
+  const ring3Ref = useRef<THREE.Mesh>(null)
+
+  useFrame(() => {
+    if (ring1Ref.current) ring1Ref.current.rotation.z += 0.02
+    if (ring2Ref.current) ring2Ref.current.rotation.z -= 0.015
+    if (ring3Ref.current) ring3Ref.current.rotation.z += 0.01
+  })
+
+  return (
+    <group position={[0, 0, TARGET_Z]}>
+      {/* Outer pulsing ring */}
+      <mesh ref={ring1Ref}>
+        <ringGeometry args={[1.8, 2.2, 32]} />
+        <meshBasicMaterial
+          color="#ff00ff"
+          transparent
+          opacity={0.3}
+          blending={THREE.AdditiveBlending}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+
+      {/* Middle ring */}
+      <mesh ref={ring2Ref}>
+        <ringGeometry args={[1.3, 1.6, 32]} />
+        <meshBasicMaterial
+          color="#00d4ff"
+          transparent
+          opacity={0.5}
+          blending={THREE.AdditiveBlending}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+
+      {/* Inner target ring */}
+      <mesh ref={ring3Ref}>
+        <ringGeometry args={[0.9, 1.1, 32]} />
+        <meshBasicMaterial
+          color="#ffffff"
+          transparent
+          opacity={0.8}
+          blending={THREE.AdditiveBlending}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+
+      {/* Center dot */}
+      <mesh>
+        <circleGeometry args={[0.1, 16]} />
+        <meshBasicMaterial
+          color="#ffffff"
+          transparent
+          opacity={0.9}
+        />
+      </mesh>
+    </group>
+  )
+}
+
 export function FallingNotes({ notes, currentTime }: FallingNotesProps) {
   return (
     <>
-      {/* Target zone */}
-      <mesh position={[0, 0, TARGET_Z]}>
-        <ringGeometry args={[1.2, 1.5, 32]} />
-        <meshStandardMaterial
-          color="#ffffff"
-          emissive="#ffffff"
-          emissiveIntensity={0.5}
-          transparent
-          opacity={0.8}
-        />
-      </mesh>
+      <TargetZone />
 
       {/* Falling notes */}
       {notes.map(note => (

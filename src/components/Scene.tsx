@@ -1,6 +1,8 @@
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, Environment, PerspectiveCamera } from '@react-three/drei'
+import { PerspectiveCamera } from '@react-three/drei'
 import { FallingNotes } from './FallingNotes'
+import { Tunnel } from './Tunnel'
+import { Particles } from './Particles'
 import type { Note } from '../hooks/useBeatGame'
 
 interface SceneProps {
@@ -10,13 +12,13 @@ interface SceneProps {
   backgroundColor: string
 }
 
-export function Scene({ notes, currentTime, combo, backgroundColor }: SceneProps) {
+export function Scene({ notes, currentTime, combo }: SceneProps) {
   return (
     <Canvas
       style={{
         width: '100%',
         height: '100%',
-        background: `linear-gradient(180deg, ${backgroundColor} 0%, #000000 100%)`
+        background: '#000'
       }}
       dpr={[1, 2]}
       gl={{
@@ -25,32 +27,42 @@ export function Scene({ notes, currentTime, combo, backgroundColor }: SceneProps
         powerPreference: 'high-performance'
       }}
     >
-      <PerspectiveCamera makeDefault position={[0, 3, 5]} fov={60} />
+      <PerspectiveCamera makeDefault position={[0, 0, 5]} fov={75} />
 
-      <ambientLight intensity={0.3} />
-      <pointLight position={[0, 5, 5]} intensity={1} color="#00d4ff" />
-      <pointLight position={[0, -5, 5]} intensity={0.5} color="#ff00ff" />
+      {/* Ambient lighting */}
+      <ambientLight intensity={0.2} />
 
-      {/* Background glow effect */}
-      <mesh position={[0, 0, -15]}>
-        <planeGeometry args={[30, 30]} />
-        <meshBasicMaterial
-          color={combo > 10 ? '#ff00ff' : combo > 5 ? '#00d4ff' : '#1a1a2e'}
-          transparent
-          opacity={0.3}
-        />
-      </mesh>
+      {/* Dynamic point lights based on combo */}
+      <pointLight
+        position={[5, 5, 2]}
+        intensity={1 + combo * 0.1}
+        color="#ff006e"
+        distance={20}
+      />
+      <pointLight
+        position={[-5, -5, 2]}
+        intensity={1 + combo * 0.1}
+        color="#00d4ff"
+        distance={20}
+      />
+      <pointLight
+        position={[0, 0, -10]}
+        intensity={0.5 + combo * 0.05}
+        color="#8338ec"
+        distance={30}
+      />
 
-      {/* Falling notes system */}
+      {/* Fog for depth */}
+      <fog attach="fog" args={['#000', 10, 50]} />
+
+      {/* Tunnel background */}
+      <Tunnel combo={combo} />
+
+      {/* Particle system */}
+      <Particles count={800} combo={combo} />
+
+      {/* Game notes and target */}
       <FallingNotes notes={notes} currentTime={currentTime} />
-
-      {/* Floor grid */}
-      <gridHelper args={[20, 20, '#333333', '#111111']} position={[0, -2, 0]} />
-
-      <Environment preset="night" />
-
-      {/* Disable orbit controls for gameplay */}
-      <OrbitControls enabled={false} />
     </Canvas>
   )
 }
