@@ -16,15 +16,33 @@ function App() {
     goodHits,
     missedHits,
     currentTime,
-    onTap,
+    onTouchStart,
+    onTouchEnd,
     startGame,
     stopGame
   } = useBeatGame()
 
-  const handleTap = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
     e.preventDefault()
-    onTap()
-  }, [onTap])
+    onTouchStart(e.clientX, e.clientY)
+  }, [onTouchStart])
+
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    e.preventDefault()
+    onTouchEnd(e.clientX, e.clientY)
+  }, [onTouchEnd])
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    e.preventDefault()
+    const touch = e.touches[0]
+    onTouchStart(touch.clientX, touch.clientY)
+  }, [onTouchStart])
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    e.preventDefault()
+    const touch = e.changedTouches[0]
+    onTouchEnd(touch.clientX, touch.clientY)
+  }, [onTouchEnd])
 
   const handleRestart = useCallback(() => {
     stopGame()
@@ -42,8 +60,10 @@ function App() {
   return (
     <div
       className="app-container"
-      onPointerDown={handleTap}
-      onTouchStart={handleTap}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
     >
       <Scene
         notes={notes}
