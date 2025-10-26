@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { repl } from '@strudel/core'
-import { mini } from '@strudel/mini'
+import { repl, s } from '@strudel/core'
 import { getAudioContext, initAudioOnFirstClick, webaudioOutput } from '@strudel/webaudio'
 import * as Tone from 'tone'
 
 const GAME_DURATION = 30000 // 30 seconds
-const TAP_WINDOW = 150 // ±150ms tolerance
-const BPM = 120
+const TAP_WINDOW = 200 // ±200ms tolerance
+const BPM = 90 // Slower tempo for easier gameplay
 
 export interface BeatGameState {
   score: number
@@ -104,22 +103,22 @@ export function useBeatGame() {
       switch (level) {
         case 0:
           // Simple kick-snare pattern
-          pattern = mini('bd sn bd sn')
+          pattern = s('bd sn bd sn')
           break
         case 1:
           // Add hi-hat
-          pattern = mini('bd sn hh bd sn hh')
+          pattern = s('bd sn hh bd sn hh')
           break
         case 2:
           // More complex pattern
-          pattern = mini('bd [sn hh] bd [sn hh]')
+          pattern = s('bd [sn hh] bd [sn hh]')
           break
         case 3:
           // Most complex
-          pattern = mini('bd sn [hh hh] bd sn hh')
+          pattern = s('bd sn [hh hh] bd sn hh')
           break
         default:
-          pattern = mini('bd sn bd sn')
+          pattern = s('bd sn bd sn')
       }
 
       // Add beat trigger callback
