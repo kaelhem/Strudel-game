@@ -83,10 +83,58 @@ html, body {
   border: 1px solid rgba(0, 212, 255, 0.3);
 }
 
-.instructions p {
-  font-size: 1.1rem;
+.instruction-row {
+  font-size: 1.2rem;
+  color: #fff;
+  margin: 0.8rem 0;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.icon {
+  font-size: 2rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 10px;
+  font-weight: 900;
+}
+
+.icon.tap {
+  background: linear-gradient(135deg, #ff006e, #ff4d8a);
+  color: white;
+}
+
+.icon.double {
+  background: linear-gradient(135deg, #ff8500, #ffb347);
+  color: white;
+}
+
+.icon.swipe-left {
+  background: linear-gradient(135deg, #00d4ff, #00aacc);
+  color: white;
+}
+
+.icon.swipe-right {
+  background: linear-gradient(135deg, #00ff88, #00cc6a);
+  color: white;
+}
+
+.icon.swipe-up {
+  background: linear-gradient(135deg, #ffbe0b, #ffd666);
+  color: white;
+}
+
+.icon.swipe-down {
+  background: linear-gradient(135deg, #8338ec, #a06cff);
+  color: white;
+}
+
+.timing-info {
+  font-size: 0.9rem;
   color: #00d4ff;
-  margin: 0.5rem 0;
+  margin-top: 1.5rem;
   font-weight: 500;
 }
 

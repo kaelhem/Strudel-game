@@ -32,11 +32,23 @@ export function ScoreDisplay({
       {!isPlaying && !gameOver && (
         <div className="start-screen">
           <h1 className="title">TAP BEAT RUSH</h1>
-          <p className="subtitle">Tap when the circles reach the target zone!</p>
+          <p className="subtitle">Match the gesture when circles reach the target!</p>
           <div className="instructions">
-            <p>Perfect: &lt;50ms = 100pts</p>
-            <p>Good: &lt;150ms = 50pts</p>
-            <p>Combo multiplier every 5 hits!</p>
+            <div className="instruction-row">
+              <span className="icon tap">⊙</span> Tap
+            </div>
+            <div className="instruction-row">
+              <span className="icon double">⊙⊙</span> Double Tap
+            </div>
+            <div className="instruction-row">
+              <span className="icon swipe-left">←</span> Swipe Left
+              <span className="icon swipe-right">→</span> Swipe Right
+            </div>
+            <div className="instruction-row">
+              <span className="icon swipe-up">↑</span> Swipe Up
+              <span className="icon swipe-down">↓</span> Swipe Down
+            </div>
+            <p className="timing-info">Perfect: &lt;50ms • Good: &lt;150ms</p>
           </div>
           <button className="start-button" onClick={onStart}>
             START GAME
@@ -59,8 +71,6 @@ export function ScoreDisplay({
               </div>
             )}
           </div>
-
-          <div className="tap-hint">TAP!</div>
 
           <div className="stats-bottom">
             <span>Perfect: {perfectHits}</span>
