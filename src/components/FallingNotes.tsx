@@ -10,9 +10,9 @@ interface FallingNotesProps {
   currentTime: number
 }
 
-const NOTE_TRAVEL_TIME = 2000 // 2 seconds to reach target
+const NOTE_TRAVEL_TIME = 3500 // 3.5 seconds to reach target (slower, more playable)
 const TARGET_Z = 0
-const START_Z = -10
+const START_Z = -15 // Start further away for longer travel
 
 function NoteCircle({ note, currentTime }: { note: Note; currentTime: number }) {
   const meshRef = useRef<THREE.Mesh>(null)
@@ -75,19 +75,19 @@ function NoteCircle({ note, currentTime }: { note: Note; currentTime: number }) 
   const getIcon = () => {
     switch (note.type) {
       case NoteType.TAP:
-        return '⊙'
+        return 'TAP'
       case NoteType.DOUBLE_TAP:
-        return '⊙⊙'
+        return 'x2'
       case NoteType.SWIPE_LEFT:
-        return '←'
+        return '<'
       case NoteType.SWIPE_RIGHT:
-        return '→'
+        return '>'
       case NoteType.SWIPE_UP:
-        return '↑'
+        return '^'
       case NoteType.SWIPE_DOWN:
-        return '↓'
+        return 'v'
       default:
-        return '⊙'
+        return 'TAP'
     }
   }
 
@@ -106,10 +106,11 @@ function NoteCircle({ note, currentTime }: { note: Note; currentTime: number }) 
       <Text
         ref={textRef}
         position={[0, 0, START_Z + 0.1]}
-        fontSize={0.6}
+        fontSize={0.5}
         color="white"
         anchorX="center"
         anchorY="middle"
+        fontWeight="bold"
       >
         {getIcon()}
       </Text>

@@ -183,13 +183,35 @@ html, body {
 }
 
 .score-display,
-.combo-display {
+.combo-display,
+.level-display {
   text-align: center;
   background: rgba(0, 0, 0, 0.7);
   padding: 1rem 2rem;
   border-radius: 15px;
   border: 2px solid rgba(0, 212, 255, 0.5);
   backdrop-filter: blur(10px);
+}
+
+.level-display {
+  border-color: rgba(255, 190, 11, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.level-label {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #ffbe0b;
+  letter-spacing: 0.1em;
+}
+
+.style-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #fb5607;
+  letter-spacing: 0.05em;
 }
 
 .score-label,

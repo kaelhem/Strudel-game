@@ -15,6 +15,8 @@ function App() {
     perfectHits,
     goodHits,
     missedHits,
+    level,
+    musicStyle,
     currentTime,
     onTouchStart,
     onTouchEnd,
@@ -89,6 +91,8 @@ function App() {
         perfectHits={perfectHits}
         goodHits={goodHits}
         missedHits={missedHits}
+        level={level}
+        musicStyle={musicStyle}
         onStart={startGame}
         onRestart={handleRestart}
       />
