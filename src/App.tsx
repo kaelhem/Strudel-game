@@ -8,10 +8,14 @@ function App() {
   const {
     score,
     combo,
+    maxCombo,
     isPlaying,
     gameOver,
-    beatActive,
-    backgroundColor,
+    notes,
+    perfectHits,
+    goodHits,
+    missedHits,
+    currentTime,
     onTap,
     startGame,
     stopGame
@@ -27,6 +31,14 @@ function App() {
     setTimeout(startGame, 100)
   }, [stopGame, startGame])
 
+  // Dynamic background color based on combo
+  const getBackgroundColor = () => {
+    if (combo > 15) return '#ff006e'
+    if (combo > 10) return '#fb5607'
+    if (combo > 5) return '#3a0ca3'
+    return '#1a1a2e'
+  }
+
   return (
     <div
       className="app-container"
@@ -34,17 +46,21 @@ function App() {
       onTouchStart={handleTap}
     >
       <Scene
-        beatActive={beatActive}
+        notes={notes}
+        currentTime={currentTime}
         combo={combo}
-        backgroundColor={backgroundColor}
+        backgroundColor={getBackgroundColor()}
       />
 
       <ScoreDisplay
         score={score}
         combo={combo}
+        maxCombo={maxCombo}
         isPlaying={isPlaying}
         gameOver={gameOver}
-        beatActive={beatActive}
+        perfectHits={perfectHits}
+        goodHits={goodHits}
+        missedHits={missedHits}
         onStart={startGame}
         onRestart={handleRestart}
       />

@@ -1,70 +1,186 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { repl, s } from '@strudel/core'
-import { getAudioContext, initAudioOnFirstClick, webaudioOutput } from '@strudel/webaudio'
 import * as Tone from 'tone'
 
-const GAME_DURATION = 30000 // 30 seconds
-const TAP_WINDOW = 200 // ±200ms tolerance
-const BPM = 90 // Slower tempo for easier gameplay
+const GAME_DURATION = 45000 // 45 seconds
+const TAP_TOLERANCE = 150 // ±150ms for perfect hit
+const BPM = 100
+
+export interface Note {
+  id: number
+  timestamp: number
+  hit: boolean
+  missed: boolean
+}
 
 export interface BeatGameState {
   score: number
-  currentBeat: number
+  combo: number
+  maxCombo: number
   isPlaying: boolean
   gameOver: boolean
-  combo: number
-  beatActive: boolean
-  backgroundColor: string
+  notes: Note[]
+  perfectHits: number
+  goodHits: number
+  missedHits: number
 }
 
 export function useBeatGame() {
   const [state, setState] = useState<BeatGameState>({
     score: 0,
-    currentBeat: 0,
+    combo: 0,
+    maxCombo: 0,
     isPlaying: false,
     gameOver: false,
-    combo: 0,
-    beatActive: false,
-    backgroundColor: '#1a1a2e'
+    notes: [],
+    perfectHits: 0,
+    goodHits: 0,
+    missedHits: 0
   })
 
-  const schedulerRef = useRef<any>(null)
-  const lastBeatTimeRef = useRef<number>(0)
-  const gameStartTimeRef = useRef<number>(0)
   const audioInitializedRef = useRef(false)
-  const currentPatternLevelRef = useRef(0)
-  const audioContextRef = useRef<AudioContext | null>(null)
+  const gameStartTimeRef = useRef<number>(0)
+  const noteIdCounterRef = useRef(0)
+  const loopRef = useRef<Tone.Loop | null>(null)
+  const kickRef = useRef<Tone.MembraneSynth | null>(null)
+  const snareRef = useRef<Tone.NoiseSynth | null>(null)
+  const beatCountRef = useRef(0)
 
-  // Play feedback sound
-  const playFeedbackSound = useCallback((success: boolean) => {
-    const synth = new Tone.Synth({
-      oscillator: { type: 'sine' },
-      envelope: {
-        attack: 0.001,
-        decay: 0.1,
-        sustain: 0,
-        release: 0.1
-      }
-    }).toDestination()
+  // Initialize audio
+  const initAudio = useCallback(async () => {
+    if (audioInitializedRef.current) return
 
-    if (success) {
-      synth.triggerAttackRelease('C5', '16n')
-    } else {
-      synth.triggerAttackRelease('F2', '16n')
+    try {
+      await Tone.start()
+      console.log('Tone.js started')
+
+      // Create kick drum
+      kickRef.current = new Tone.MembraneSynth({
+        pitchDecay: 0.05,
+        octaves: 10,
+        oscillator: { type: 'sine' },
+        envelope: {
+          attack: 0.001,
+          decay: 0.4,
+          sustain: 0.01,
+          release: 1.4,
+          attackCurve: 'exponential'
+        }
+      }).toDestination()
+
+      // Create snare drum
+      snareRef.current = new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: {
+          attack: 0.001,
+          decay: 0.2,
+          sustain: 0
+        }
+      }).toDestination()
+
+      audioInitializedRef.current = true
+      console.log('Audio instruments initialized')
+    } catch (error) {
+      console.error('Failed to initialize audio:', error)
+    }
+  }, [])
+
+  // Add a new note
+  const addNote = useCallback(() => {
+    const now = performance.now()
+    const newNote: Note = {
+      id: noteIdCounterRef.current++,
+      timestamp: now,
+      hit: false,
+      missed: false
     }
 
-    setTimeout(() => synth.dispose(), 200)
+    setState(prev => ({
+      ...prev,
+      notes: [...prev.notes, newNote]
+    }))
   }, [])
+
+  // Play beat sound
+  const playBeat = useCallback((beatNumber: number) => {
+    const now = Tone.now()
+
+    if (beatNumber % 4 === 0) {
+      // Kick on beats 1 and 3
+      kickRef.current?.triggerAttackRelease('C1', '8n', now)
+    } else if (beatNumber % 4 === 2) {
+      // Snare on beats 2 and 4
+      snareRef.current?.triggerAttackRelease('16n', now)
+    } else {
+      // Light kick on other beats
+      kickRef.current?.triggerAttackRelease('C1', '16n', now, 0.3)
+    }
+  }, [])
+
+  // Start the game
+  const startGame = useCallback(async () => {
+    await initAudio()
+
+    console.log('Starting game...')
+
+    // Reset state
+    setState({
+      score: 0,
+      combo: 0,
+      maxCombo: 0,
+      isPlaying: true,
+      gameOver: false,
+      notes: [],
+      perfectHits: 0,
+      goodHits: 0,
+      missedHits: 0
+    })
+
+    noteIdCounterRef.current = 0
+    beatCountRef.current = 0
+    gameStartTimeRef.current = performance.now()
+
+    // Create beat loop
+    loopRef.current = new Tone.Loop((time) => {
+      const beatNumber = beatCountRef.current++
+
+      // Play sound
+      playBeat(beatNumber)
+
+      // Add note for player to hit
+      Tone.Draw.schedule(() => {
+        addNote()
+      }, time)
+
+      // Check game duration
+      const elapsed = performance.now() - gameStartTimeRef.current
+      if (elapsed >= GAME_DURATION) {
+        loopRef.current?.stop()
+        Tone.Transport.stop()
+
+        setState(prev => ({
+          ...prev,
+          isPlaying: false,
+          gameOver: true
+        }))
+      }
+    }, `${4}n`) // Quarter note
+
+    loopRef.current.start(0)
+    Tone.Transport.bpm.value = BPM
+    Tone.Transport.start()
+
+    console.log('Game loop started')
+  }, [initAudio, addNote, playBeat])
 
   // Stop the game
   const stopGame = useCallback(() => {
-    if (schedulerRef.current) {
-      try {
-        schedulerRef.current.stop()
-      } catch (e) {
-        console.error('Error stopping scheduler:', e)
-      }
+    if (loopRef.current) {
+      loopRef.current.stop()
+      loopRef.current.dispose()
+      loopRef.current = null
     }
+
+    Tone.Transport.stop()
 
     setState(prev => ({
       ...prev,
@@ -72,157 +188,6 @@ export function useBeatGame() {
       gameOver: true
     }))
   }, [])
-
-  // Create beat callback
-  const onBeat = useCallback(() => {
-    const now = Date.now()
-    lastBeatTimeRef.current = now
-
-    // Flash the beat indicator
-    setState(prev => ({
-      ...prev,
-      currentBeat: prev.currentBeat + 1,
-      beatActive: true
-    }))
-
-    setTimeout(() => {
-      setState(prev => ({ ...prev, beatActive: false }))
-    }, 100)
-
-    // Check game duration
-    if (now - gameStartTimeRef.current >= GAME_DURATION) {
-      stopGame()
-    }
-  }, [stopGame])
-
-  // Create pattern for current level
-  const createPattern = useCallback((level: number) => {
-    try {
-      let pattern
-
-      switch (level) {
-        case 0:
-          // Simple kick-snare pattern
-          pattern = s('bd sn bd sn')
-          break
-        case 1:
-          // Add hi-hat
-          pattern = s('bd sn hh bd sn hh')
-          break
-        case 2:
-          // More complex pattern
-          pattern = s('bd [sn hh] bd [sn hh]')
-          break
-        case 3:
-          // Most complex
-          pattern = s('bd sn [hh hh] bd sn hh')
-          break
-        default:
-          pattern = s('bd sn bd sn')
-      }
-
-      // Add beat trigger callback
-      return pattern.onTrigger(onBeat)
-    } catch (error) {
-      console.error('Failed to create pattern:', error)
-      return null
-    }
-  }, [onBeat])
-
-  // Set pattern on scheduler
-  const setPattern = useCallback((level: number) => {
-    if (!schedulerRef.current) {
-      console.error('Scheduler not initialized')
-      return
-    }
-
-    try {
-      const pattern = createPattern(level)
-      if (pattern) {
-        console.log('Setting pattern for level:', level)
-        schedulerRef.current.setPattern(pattern, true)
-        console.log('Pattern set successfully')
-      }
-    } catch (error) {
-      console.error('Failed to set pattern:', error)
-    }
-  }, [createPattern])
-
-  // Enrich pattern with more instruments
-  const enrichPattern = useCallback(() => {
-    if (currentPatternLevelRef.current < 3) {
-      currentPatternLevelRef.current += 1
-      console.log('Enriching pattern to level:', currentPatternLevelRef.current)
-      setPattern(currentPatternLevelRef.current)
-    }
-  }, [setPattern])
-
-  // Initialize audio context
-  const initAudio = useCallback(async () => {
-    if (audioInitializedRef.current) return
-
-    try {
-      console.log('Initializing audio...')
-      await initAudioOnFirstClick()
-      await Tone.start()
-
-      audioContextRef.current = getAudioContext()
-      console.log('Audio context obtained:', audioContextRef.current)
-
-      // Initialize scheduler with proper configuration
-      const { scheduler } = repl({
-        defaultOutput: webaudioOutput,
-        getTime: () => audioContextRef.current?.currentTime || 0
-      })
-
-      schedulerRef.current = scheduler
-
-      // Set tempo (BPM / 60 / 4 for cycles per second)
-      const cps = BPM / 60 / 4
-      schedulerRef.current.setCps(cps)
-      console.log('Scheduler initialized with CPS:', cps)
-
-      audioInitializedRef.current = true
-      console.log('Audio and scheduler initialized successfully')
-    } catch (error) {
-      console.error('Failed to initialize audio:', error)
-    }
-  }, [])
-
-  // Start the game
-  const startGame = useCallback(async () => {
-    console.log('Starting game...')
-    await initAudio()
-
-    if (!schedulerRef.current) {
-      console.error('Scheduler not initialized')
-      return
-    }
-
-    setState(prev => ({
-      ...prev,
-      isPlaying: true,
-      gameOver: false,
-      score: 0,
-      combo: 0,
-      currentBeat: 0,
-      backgroundColor: '#1a1a2e'
-    }))
-
-    currentPatternLevelRef.current = 0
-    gameStartTimeRef.current = Date.now()
-
-    try {
-      // Set initial pattern
-      setPattern(0)
-
-      // Start the scheduler
-      schedulerRef.current.start()
-      console.log('Game started, scheduler running')
-    } catch (error) {
-      console.error('Failed to start game:', error)
-    }
-  }, [initAudio, setPattern])
 
   // Handle tap
   const onTap = useCallback(() => {
@@ -233,59 +198,111 @@ export function useBeatGame() {
       return
     }
 
-    const now = Date.now()
-    const timeSinceLastBeat = now - lastBeatTimeRef.current
+    const now = performance.now()
 
-    console.log('Tap! Time since last beat:', timeSinceLastBeat)
-
-    // Check if tap is within the timing window
-    if (timeSinceLastBeat <= TAP_WINDOW) {
-      // Success!
-      const newCombo = state.combo + 1
-      const newScore = state.score + 10 + (newCombo * 2)
-
-      // Change background color on success
-      const hue = (newScore * 3) % 360
-      const newBgColor = `hsl(${hue}, 40%, 20%)`
-
-      setState(prev => ({
-        ...prev,
-        score: newScore,
-        combo: newCombo,
-        backgroundColor: newBgColor
-      }))
-
-      // Every 5 combo, enrich the pattern
-      if (newCombo % 5 === 0 && newCombo > 0) {
-        enrichPattern()
-      }
-
-      // Play success sound
-      playFeedbackSound(true)
-      console.log('HIT! Score:', newScore, 'Combo:', newCombo)
-    } else {
-      // Miss
+    // Find the closest unhit note
+    const activeNotes = state.notes.filter(n => !n.hit && !n.missed)
+    if (activeNotes.length === 0) {
+      // Tap with no notes = combo breaker
       setState(prev => ({
         ...prev,
         combo: 0
       }))
-
-      // Play miss sound
-      playFeedbackSound(false)
-      console.log('MISS!')
+      return
     }
-  }, [state.isPlaying, state.gameOver, state.combo, state.score, startGame, playFeedbackSound, enrichPattern])
+
+    // Find closest note
+    let closestNote = activeNotes[0]
+    let minDiff = Math.abs((now - closestNote.timestamp) - 2000) // Notes travel for 2 seconds
+
+    activeNotes.forEach(note => {
+      const diff = Math.abs((now - note.timestamp) - 2000)
+      if (diff < minDiff) {
+        minDiff = diff
+        closestNote = note
+      }
+    })
+
+    const timingDiff = Math.abs((now - closestNote.timestamp) - 2000)
+
+    if (timingDiff <= TAP_TOLERANCE) {
+      // HIT!
+      const points = timingDiff < 50 ? 100 : timingDiff < 100 ? 50 : 25
+      const newCombo = state.combo + 1
+      const comboMultiplier = Math.floor(newCombo / 5) + 1
+      const totalPoints = points * comboMultiplier
+
+      setState(prev => ({
+        ...prev,
+        score: prev.score + totalPoints,
+        combo: newCombo,
+        maxCombo: Math.max(prev.maxCombo, newCombo),
+        perfectHits: timingDiff < 50 ? prev.perfectHits + 1 : prev.perfectHits,
+        goodHits: timingDiff >= 50 ? prev.goodHits + 1 : prev.goodHits,
+        notes: prev.notes.map(n =>
+          n.id === closestNote.id ? { ...n, hit: true } : n
+        )
+      }))
+
+      // Play hit sound
+      const hitSynth = new Tone.Synth({
+        oscillator: { type: 'sine' },
+        envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.1 }
+      }).toDestination()
+
+      const frequency = timingDiff < 50 ? 'C5' : 'E4'
+      hitSynth.triggerAttackRelease(frequency, '16n')
+      setTimeout(() => hitSynth.dispose(), 200)
+
+      console.log(`HIT! Timing: ${timingDiff}ms, Points: ${totalPoints}, Combo: ${newCombo}`)
+    } else {
+      // MISS
+      setState(prev => ({
+        ...prev,
+        combo: 0
+      }))
+      console.log('MISS! Too far from note')
+    }
+  }, [state.isPlaying, state.gameOver, state.combo, state.notes, startGame])
+
+  // Clean up missed notes
+  useEffect(() => {
+    if (!state.isPlaying) return
+
+    const interval = setInterval(() => {
+      const now = performance.now()
+
+      setState(prev => {
+        const updatedNotes = prev.notes.map(note => {
+          // If note is older than 2.2 seconds and not hit, mark as missed
+          if (!note.hit && !note.missed && (now - note.timestamp) > 2200) {
+            return { ...note, missed: true }
+          }
+          return note
+        })
+
+        const newMissCount = updatedNotes.filter(n => n.missed).length - prev.notes.filter(n => n.missed).length
+
+        return {
+          ...prev,
+          notes: updatedNotes.filter(n => (now - n.timestamp) < 3000), // Remove old notes
+          missedHits: newMissCount > 0 ? prev.missedHits + newMissCount : prev.missedHits,
+          combo: newMissCount > 0 ? 0 : prev.combo
+        }
+      })
+    }, 50)
+
+    return () => clearInterval(interval)
+  }, [state.isPlaying])
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (schedulerRef.current) {
-        try {
-          schedulerRef.current.stop()
-        } catch (e) {
-          console.error('Error during cleanup:', e)
-        }
+      if (loopRef.current) {
+        loopRef.current.stop()
+        loopRef.current.dispose()
       }
+      Tone.Transport.stop()
     }
   }, [])
 
@@ -293,6 +310,7 @@ export function useBeatGame() {
     ...state,
     onTap,
     startGame,
-    stopGame
+    stopGame,
+    currentTime: state.isPlaying ? performance.now() : 0
   }
 }
