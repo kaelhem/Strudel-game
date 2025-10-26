@@ -1,13 +1,10 @@
 declare module '@strudel/core' {
   export function repl(config?: any): any
+  export function s(pattern: string): any
+  export function sound(pattern: string): any
+  export function note(...args: any[]): any
   export function sequence(...args: any[]): any
   export function stack(...args: any[]): any
-}
-
-declare module '@strudel/mini' {
-  export function mini(pattern: string): any
-  export function h(pattern: string): any
-  export function m(pattern: string, position?: number): any
 }
 
 declare module '@strudel/webaudio' {
